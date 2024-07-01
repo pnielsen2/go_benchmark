@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: go-benchmark
+Version: 0.1
+Summary: Go UQ benchmarking and dataset generator
+Author: Philip Nielsen
+Author-email: pnielsen2@outlook.com
+License: MIT
+License-File: LICENSE

@@ -1,0 +1,148 @@
+Timer unit: 1e-06 s
+
+Total time: 11.5152 s
+File: openspiel_test.py
+Function: main at line 73
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    73                                           @profile
+    74                                           def main(rl_config, game_params):
+    75                                           
+    76         1          1.0      1.0      0.0      network = None
+    77         1          1.0      1.0      0.0      game_name, game_config = game_params
+    78         1         34.0     34.0      0.0      game = pyspiel.load_game(*game_params)
+    79         1          2.0      2.0      0.0      observation_tensor_shape = game.observation_tensor_shape()
+    80         1          1.0      1.0      0.0      num_distinct_actions = game.num_distinct_actions()
+    81         1         13.0     13.0      0.0      print(observation_tensor_shape)
+    82         1          2.0      2.0      0.0      print(num_distinct_actions)
+    83         1         12.0     12.0      0.0      buffer = Buffer(rl_config['buffer_test_capacity'], rl_config['buffer_train_capacity'], observation_tensor_shape, game.num_distinct_actions())
+    84                                           
+    85         1          0.0      0.0      0.0      state_data_dict = {}
+    86         1          0.0      0.0      0.0      network_preds = {}
+    87         1          0.0      0.0      0.0      num_games = 0
+    88         1          0.0      0.0      0.0      average_depth = 1
+    89         1          0.0      0.0      0.0      average_entropy = 1
+    90         1          0.0      0.0      0.0      num_transitions_observed = 0
+    91                                               
+    92         1          2.0      2.0      0.0      print('start')
+    93         1         10.0     10.0      0.0      log_branching_factors = np.zeros(game.max_game_length())
+    94      6130        875.0      0.1      0.0      while True:
+    95                                           
+    96      6130      21611.0      3.5      0.2          state = game.new_initial_state()
+    97      6130       2666.0      0.4      0.0          game_data = []
+    98                                                   
+    99      6130       2807.0      0.5      0.0          state_string = state.information_state_string()
+   100      6130       1483.0      0.2      0.0          if state_string in state_data_dict and state_data_dict[state_string]['solution'] !=None:
+   101                                                       solution_winner = {0:'black', 1:'white'}[state_data['solution']]
+   102                                                       print(f'game solved for {solution_winner}')
+   103                                                       break
+   104      6130        957.0      0.2      0.0          num_games +=1
+   105    107295      14732.0      0.1      0.1          while True:
+   106    107295      68641.0      0.6      0.6              state_string = state.information_state_string()
+   107    107295      13919.0      0.1      0.1              if rl_config['symmetrized_observation_tensors']:
+   108                                                           reshaped_tensor = torch.tensor(state.observation_tensor()).view(-1,game_config['board_size'], game_config['board_size'])
+   109                                                           found_symmetry = False
+   110                                                           for i in range(game_symmetry_info[game_name]['num_game_symmetries']):
+   111                                                               tensor_symmetry, action_symmetry = game_symmetry_info[game_name]['symmetry_function'](reshaped_tensor, i)
+   112                                                               if tensor_symmetry in buffer.hash_map['Test']:
+   113                                                                   observation_tensor, action_mapping = tensor_symmetry, action_symmetry
+   114                                                                   found_symmetry = True
+   115                                                           if not found_symmetry:
+   116                                                               observation_tensor, action_mapping = tuple(state.observation_tensor()), range(num_distinct_actions)
+   117                                                       else:
+   118    107295     108953.0      1.0      0.9                  observation_tensor, action_mapping = tuple(state.observation_tensor()), range(num_distinct_actions)
+   119                                                       
+   120    107295      31130.0      0.3      0.3              if state_string not in state_data_dict:
+   121     20799       3178.0      0.2      0.0                  num_transitions_observed +=1
+   122     20799      14231.0      0.7      0.1                  legal_actions = state.legal_actions()
+   123                                           
+   124     20799       7527.0      0.4      0.1                  state_data_dict[state_string] = {
+   125     20799       1738.0      0.1      0.0                      'legal_actions': legal_actions,
+   126     20799       1579.0      0.1      0.0                      'observation_tensor': observation_tensor,
+   127     20799       1733.0      0.1      0.0                      'action_mapping': action_mapping,
+   128     20799       1781.0      0.1      0.0                      'solution': None,
+   129     20799       1827.0      0.1      0.0                      'parents': [],
+   130     20799       5120.0      0.2      0.0                      'children_solutions': [None]*len(legal_actions)
+   131                                                           }
+   132                                           
+   133    107295      17758.0      0.2      0.2              state_data = state_data_dict[state_string]
+   134    107295      18712.0      0.2      0.2              if state_data['solution'] !=None:
+   135                                                           break
+   136                                                       
+   137    107295      11783.0      0.1      0.1              legal_actions = state_data['legal_actions']
+   138    107295      10734.0      0.1      0.1              children_solutions = state_data['children_solutions']
+   139    107295     124929.0      1.2      1.1              action_options = [legal_actions[i] for i in range(len(legal_actions)) if children_solutions[i]==None]
+   140                                                       
+   141    107295      20273.0      0.2      0.2              observation_tensor = state_data['observation_tensor']
+   142    107295      11773.0      0.1      0.1              action_mapping = state_data['action_mapping']
+   143    107295      82934.0      0.8      0.7              transformed_action_options = [action_mapping[x] for x in action_options]
+   144    107295     720925.0      6.7      6.3              outcomes = buffer.get_observation_outcomes(observation_tensor, transformed_action_options)
+   145                                           
+   146    107295      59737.0      0.6      0.5              if observation_tensor not in network_preds:
+   147      3954       8013.0      2.0      0.1                  network_preds[observation_tensor] = torch.full((num_distinct_actions,2), .5) if network == None else network(torch.tensor(observation_tensor).view(1,*observation_tensor_shape))['alpha'].squeeze(0)
+   148                                                       
+   149    107295     548256.0      5.1      4.8              state_preds = network_preds[observation_tensor][action_options]
+   150    107295     249767.0      2.3      2.2              posteriors = outcomes + state_preds
+   151    107295     466883.0      4.4      4.1              p = posteriors.sum(axis=-1)/posteriors.sum()
+   152                                                       
+   153    107295     261508.0      2.4      2.3              entropy = -p.dot(torch.log2(p)).item()
+   154    107295      23100.0      0.2      0.2              average_entropy= .999 * average_entropy + .001 * entropy
+   155    107295      58558.0      0.5      0.5              log_branching_factors[len(game_data)] = log_branching_factors[len(game_data)]*.99 + entropy*.01
+   156    107295      43747.0      0.4      0.4              current_player = state.current_player()
+   157    107295      18134.0      0.2      0.2              if rl_config['index_function'] == 'thompson':
+   158                                                           indices = pyro.distributions.Dirichlet(posteriors).sample()
+   159                                                           action = action_options[indices[:, current_player].argmax()]
+   160    107295      13631.0      0.1      0.1              elif rl_config['index_function'] == 'MOSSE':
+   161                                                           indices = MOSSEindices(posteriors, current_player)
+   162                                                           a = (indices==indices.max()).nonzero()
+   163                                                           action = action_options[a[np.random.randint(len(a))]]
+   164                                                           # action = action_options[a[-1]]
+   165    107295      12896.0      0.1      0.1              elif rl_config['index_function'] == 'mean':
+   166    107295     550150.0      5.1      4.8                  indices = posteriors[:, current_player]/posteriors.sum(-1)
+   167    107295     221327.0      2.1      1.9                  action = action_options[indices.argmax()]
+   168                                                       
+   169    107295      25592.0      0.2      0.2              game_data.append((state_string, observation_tensor, action, current_player))
+   170                                                       
+   171    107295      65898.0      0.6      0.6              state.apply_action(action)
+   172    107295      36128.0      0.3      0.3              if state.is_terminal():
+   173      6130        978.0      0.2      0.0                  num_transitions_observed +=1
+   174      6130        594.0      0.1      0.0                  break
+   175      6130       1987.0      0.3      0.0          average_depth = .999*average_depth + .001 * len(game_data)
+   176                                                   
+   177      6130    6937310.0   1131.7     60.2          print('game number: ', num_games)
+   178                                                   # print(buffer.size())
+   179                                                   # print(f'transitions: {num_transitions_observed}')
+   180                                                   # print(f'average depth: {average_depth}')
+   181                                                   # print('estimated entropy:', average_depth*average_entropy)
+   182                                                   # print('\t'.join([str(round(2**x,3)) for x in log_branching_factors]))
+   183                                                   
+   184      6129       5741.0      0.9      0.0          winner = current_player if state.rewards()[current_player]>0 else 1 - current_player
+   185      6129        665.0      0.1      0.0          last_node_solution = winner
+   186    113406      27232.0      0.2      0.2          for state_string, observation_tensor, action, current_player in reversed(game_data):
+   187    107277      43847.0      0.4      0.4              if (observation_tensor, state_data_dict[state_string]['action_mapping'][action]) not in state_data['parents']:
+   188     26926       6965.0      0.3      0.1                  state_data['parents'].append((observation_tensor, action))
+   189    107277      16998.0      0.2      0.1              state_data = state_data_dict[state_string]
+   190    107277      12583.0      0.1      0.1              action_mapping = state_data['action_mapping']
+   191    107277     276232.0      2.6      2.4              buffer.add_data(observation_tensor, action_mapping[action], winner)
+   192                                                       
+   193    107277      12393.0      0.1      0.1              children_solutions = state_data['children_solutions']
+   194    107277      26279.0      0.2      0.2              children_solutions[state_data['legal_actions'].index(action)] = last_node_solution
+   195    107277      12852.0      0.1      0.1              if last_node_solution == current_player:
+   196      8833       1235.0      0.1      0.0                  state_data['solution'] = last_node_solution
+   197                                                       else:
+   198     98444      11123.0      0.1      0.1                  opponent = 1-current_player
+   199     98444     118137.0      1.2      1.0                  if any(x != opponent for x in children_solutions):
+   200     94493      10576.0      0.1      0.1                      last_node_solution = None
+   201                                                           else:
+   202      3951        719.0      0.2      0.0                      state_data['solution'] = opponent
+   203      6129       1055.0      0.2      0.0          if not rl_config['tabular']:
+   204                                                       if len(buffer.test_list)>buffer.test_capacity*(1+rl_config['buffer_refresh_proportion']):
+   205                                                           dataset = buffer.get_dataset('mps')
+   206                                                           network = train(network, dataset, f'{4}x{game_config["board_size"]}_{game_name}_tests', using_wandb=False).to('cpu')
+   207                                                           network_preds = {}
+   208                                               print('done')
+   209                                               print(f'number of transitions observed: {num_transitions_observed}')
+   210                                               print(f'number of games played: {num_games}')
+   211                                               return num_transitions_observed
+
